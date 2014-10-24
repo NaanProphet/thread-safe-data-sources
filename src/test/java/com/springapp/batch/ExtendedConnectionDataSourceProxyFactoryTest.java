@@ -44,7 +44,7 @@ public class ExtendedConnectionDataSourceProxyFactoryTest {
     /**
      * The number of partitions to create.
      */
-    public static final int GRID_SIZE = 1;
+    public static final int GRID_SIZE = 10;
 
     /**
      * Should be used for both corePoolSize and maxPoolSize
