@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:batch="http://www.springframework.org/schema/batch"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/batch
+       http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+    <batch:job id="sampleJob">
+
+        <batch:step id="partitionStep">
+            <batch:partition step="stepOne" partitioner="partitioner">
+                <batch:handler
+                        grid-size="#{T(com.springapp.batch.ExtendedConnectionDataSourceProxyFactoryTest).GRID_SIZE}"
+                               task-executor="taskExecutor"/>
+            </batch:partition>
+        </batch:step>
+
+    </batch:job>
+
+    <batch:step id="stepOne">
+        <batch:tasklet transaction-manager="transactionManager">
+            <batch:chunk reader="cursorItemReader" processor="simpleProcessor" writer="jdbcWriter" commit-interval="1"/>
+        </batch:tasklet>
+    </batch:step>
+
+    <bean id="partitioner" class="com.springapp.batch.MesaPartitioner"/>
+
+    <bean id="taskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+        <property name="corePoolSize" value="#{T(com.springapp.batch.ExtendedConnectionDataSourceProxyFactoryTest).POOL_SIZE}"/>
+        <property name="maxPoolSize" value="#{T(com.springapp.batch.ExtendedConnectionDataSourceProxyFactoryTest).POOL_SIZE}"/>
+    </bean>
+
+
+    <bean name="cursorItemReader" class="com.springapp.batch.SpyingJdbcCursorItemReader" scope="step">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="sql"
+                  value="select NAME from #{T(com.springapp.batch.ExtendedConnectionDataSourceProxyFactoryTest).REF_TABLE_PREFIX}#{stepExecutionContext[T(com.springapp.batch.MesaPartitioner).TABLE_NUM_KEY]}"/>
+        <property name="rowMapper">
+            <bean class="org.springframework.jdbc.core.SingleColumnRowMapper"/>
+        </property>
+        <!-- set the crucial property for the test -->
+        <property name="useSharedExtendedConnection" value="true"/>
+    </bean>
+
+    <bean id="simpleProcessor" class="com.springapp.batch.SimpleProcessor"/>
+
+    <bean id="jdbcWriter" class="com.springapp.batch.SpyingJdbcBatchItemWriter" scope="step">
+        <description>Note: this writer updates the same rows that it reads.</description>
+        <property name="dataSource" ref="dataSource"/>
+        <property name="sql"
+                  value="update #{T(com.springapp.batch.ExtendedConnectionDataSourceProxyFactoryTest).REF_TABLE_PREFIX}#{stepExecutionContext[T(com.springapp.batch.MesaPartitioner).TABLE_NUM_KEY]}
+                  set VAL = 'hi' where NAME = :name"/>
+        <property name="itemSqlParameterSourceProvider">
+            <bean class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+        </property>
+
+    </bean>
+
+</beans>
